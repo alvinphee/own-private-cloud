@@ -252,7 +252,7 @@ services:
       - "traefik.http.routers.xbs.tls.certresolver=default"
       - "traefik.http.routers.xbs.middlewares=security@file"
 
-  # XBS + Wekan database
+  # XBS database
   mongo:
     build:
       context: ./
@@ -262,9 +262,6 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-      - WEKAN_DATABASE=${WEKAN_DATABASE}
-      - WEKAN_DB_USERNAME=${WEKAN_DB_USERNAME}
-      - WEKAN_DB_PASSWORD=${WEKAN_DB_PASSWORD}
       - XBS_DATABASE=${XBS_DATABASE}
       - XBS_DB_USERNAME=${XBS_DB_USERNAME}
       - XBS_DB_PASSWORD=${XBS_DB_PASSWORD}
@@ -273,7 +270,6 @@ services:
       - database_mongo_volume:/data/db
     networks:
       - bookmarks_network
-      - tasks_network
 
   # Syncthing
   syncthing:
@@ -303,27 +299,47 @@ services:
       - "traefik.http.routers.syncthing.middlewares=security@file"
       - "traefik.http.services.syncthing.loadbalancer.server.port=8384"
 
-  # Wekan (tasks)
-  wekan:
-    image: wekanteam/wekan
+  # Planka (tasks)
+  planka:
+    image: meltyshev/planka:latest
     container_name: tasks
+    command: >
+      bash -c
+        "for i in `seq 1 30`; do
+          ./start.sh &&
+          s=$$? && break || s=$$?;
+          echo \"Tried $$i times. Waiting 5 seconds...\";
+          sleep 5;
+        done; (exit $$s)"
     environment:
-      - MONGO_URL=mongodb://${WEKAN_DB_USERNAME}:${WEKAN_DB_PASSWORD}@mongo:27017/${WEKAN_DATABASE}?authSource=admin
-      - ROOT_URL=https://${TASKS_DOMAIN}
-      - MAIL_URL=smtps://${MAIL_USERNAME}:${MAIL_PASSWORD}@${MAIL_HOST}:${MAIL_PORT}
-      - MAIL_FROM=${WEKAN_MAIL_FROM}
+      - BASE_URL=https://${TASKS_DOMAIN}
+      - DATABASE_URL=postgresql://postgres@postgres/${PLANKA_DATABASE_NAME}
+      - SECRET_KEY=${PLANKA_SECRET}
     restart: unless-stopped
     depends_on:
-      - mongo
+      - postgres
     networks:
       - tasks_network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wekan.entrypoints=websecure"
-      - "traefik.http.routers.wekan.rule=Host(`${TASKS_DOMAIN}`)"
-      - "traefik.http.routers.wekan.tls=true"
-      - "traefik.http.routers.wekan.tls.certresolver=default"
-      - "traefik.http.routers.wekan.middlewares=security@file"
+      - "traefik.http.routers.planka.entrypoints=websecure"
+      - "traefik.http.routers.planka.rule=Host(`${TASKS_DOMAIN}`)"
+      - "traefik.http.routers.planka.tls=true"
+      - "traefik.http.routers.planka.tls.certresolver=default"
+      - "traefik.http.routers.planka.middlewares=security@file"
+    volumes:
+      - files_planka_volume:/app/public/attachments
+
+  postgres:
+    image: postgres:13.0-alpine
+    restart: unless-stopped
+    volumes:
+      - database_postgres_volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${PLANKA_DATABASE_NAME}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    networks:
+      - tasks_network
 
   # Mails (bound on a specific IP for the reverse to be unique)
   dovecot:
@@ -500,6 +516,12 @@ volumes:
       o: bind
       type: none
       device: /mnt/databases/mysql
+  database_postgres_volume: # This volume is actually an attached OpenStack Block storage
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /mnt/databases/postgres
   database_couch_volume: # This volume is actually an attached OpenStack Block storage
     driver: local
     driver_opts:
@@ -530,6 +552,12 @@ volumes:
       o: bind
       type: none
       device: /mnt/files/cryptpad
+  files_planka_volume: # This volume is actually an attached OpenStack Block storage. It stores the planka attachments
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /mnt/files/tasks
   mails_volume: # This volume is actually an attached OpenStack Block storage. It stores the mail data
     driver: local
     driver_opts:
