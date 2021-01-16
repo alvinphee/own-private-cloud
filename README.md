@@ -68,6 +68,31 @@ Services :
 
     eval $(docker-machine env default)
 
+### Alternatively, you can create a context :
+
+First, get the host from your `docker-machine env`:
+
+    docker-machine env | grep HOST
+
+Which will return something like:
+
+`export DOCKER_HOST="tcp://xx.yy.zz.aa:2376"`
+
+Use this remote host to create a new context (you can name it how you like, I used `cloud` here):
+
+    docker context create cloud --docker "host=tcp://xx.yy.zz.aa:2376,cert=~/.docker/machine/certs/cert.pem,key=~/.docker/machine/certs/key.pem,ca=~/.docker/machine/certs/ca.pem"
+
+Then, you just have to `docker context use cloud` before being able to run commands as usual.
+
+> You will find all your contexts with `docker context ls` :
+>
+>     $ docker context ls
+>     NAME                DESCRIPTION                               DOCKER ENDPOINT               KUBERNETES ENDPOINT   ORCHESTRATOR
+>     cloud *                                                       tcp://xx.yy.zz.aa:2376
+>     default             Current DOCKER_HOST based configuration   unix:///var/run/docker.sock                         swarm
+
+> Pay attention! `docker-compose` does not know of contexts ...
+
 ## Init all submodules to retrieve up to date code
 
     git submodule update --init
@@ -83,6 +108,16 @@ Build configuration files first (_so that environment variables are replaced cor
 And then build the images :
 
     docker-compose build
+
+> If you want to extend the Docker Compose services definitions, you can create an addendum `docker-compose.supplementary.yaml` file for instance, and run `docker-compose` using both files to merge the configurations:
+> 
+>     docker-compose -f docker-compose.yaml -f docker-compose.supplementary.yml ps
+>
+> You can check that your configuration is merged correctly with:
+> 
+>     docker-compose -f docker-compose.yaml -f docker-compose.supplementary.yml config
+>   
+> See [this Medium post](https://pscheit.medium.com/docker-compose-advanced-configuration-541356d121de) for more details
 
 ## Set the Cozy instance
 
@@ -116,8 +151,7 @@ For instance:
 
     docker rm -f davis davis-proxy && docker volume rm davis_www
     docker container prune && docker image prune
-    docker-compose build davis
-    docker-compose up -d --force-recreate davis-proxy davis
+    docker-compose up -d --force-recreate --build davis-proxy davis
 
 # SSL
 

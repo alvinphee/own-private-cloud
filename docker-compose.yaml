@@ -98,17 +98,12 @@ services:
       - RAILS_ENV=production
       - RAILS_SERVE_STATIC_FILES=true
       - SECRET_KEY_BASE=${NOTES_SECRET_KEY_BASE}
-      - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_DATABASE=${NOTES_DATABASE}
       - DB_USERNAME=${NOTES_DB_USERNAME}
       - DB_PASSWORD=${NOTES_DB_PASSWORD}
       - DISABLE_USER_REGISTRATION=true
     restart: unless-stopped
-    command: >
-        sh -c 'while ! nc -vz mysql 3306 ; do sleep 10 ; done &&
-               bundle exec rails db:migrate &&
-               bundle exec rails server -b 0.0.0.0'
     depends_on:
       - mysql
     networks:
@@ -140,7 +135,7 @@ services:
       context: ./
       dockerfile: ./build/Dockerfile-cozy
       args:
-        version: "1.4.17"
+        version: "1.4.21"
     image: cozy:custom
     container_name: cozy
     environment:
@@ -204,7 +199,7 @@ services:
       context: ./
       dockerfile: ./build/Dockerfile-davis
       args:
-        version: "1.4.9"
+        version: "1.6.0"
     image: davis:custom
     container_name: davis
     environment:
@@ -216,6 +211,7 @@ services:
       - ADMIN_PASSWORD=${DAVIS_ADMIN_PASSWORD}
       - AUTH_REALM=${DAVIS_AUTH_REALM}
       - AUTH_METHOD=Digest
+      - IMAP_AUTH_URL=null
       - CALDAV_ENABLED=true
       - CARDDAV_ENABLED=true
       - WEBDAV_ENABLED=false
@@ -467,7 +463,7 @@ services:
       context: ./
       dockerfile: ./build/Dockerfile-cryptpad
       args:
-        version: "3.21.0"
+        version: "3.24.0"
     image: cryptpad:custom
     container_name: cryptpad
     restart: unless-stopped
